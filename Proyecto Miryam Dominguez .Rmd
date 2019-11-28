@@ -1,0 +1,124 @@
+---
+title: "Business Performance Analysis"
+subtitle: "Proyecto Final"
+author: "Miryam Dominguez Vidales"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+library(rvest)
+library(countrycode)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(plotly)
+library(knitr)
+library(formattable)
+library(kableExtra)
+```
+
+>## <span style="color:blue">Expresiones Regulares</span>
+
+Consultando diversas fuentes y en base a lo estudiado en clase podemos argumentar que 
+las **Regex** más largas generalmente son mejores ya que puedes hacer uso especifico de diferentes caracteres, clases y elementos estructurales. Lo que permite que las expresiones regulares sean más rápidas ya que predicen el input de forma mas precisa. 
+
+Las expresiones regulares aunque son buenas hay unas mejores que otras ya que cuando utilizamos inputs que no coinciden esto puede tomar mucho más tiempo que cuando utilizamos inputs que coinciden. 
+
+Es por eso que es importante intentar usar la menor cantidad de caracteres a scanear para buscar el match, de esta forma los regexes sera mucho más rapidos. 
+
+Para conocer más sobre ecpresiones regulares y su aplicación sugerimos visitar los siguientes sitios web: 
+
+* [RexEgg](https://www.rexegg.com)   
+* [Regular-Expressions](https://www.regular-expressions.info/rlanguage.html)
+
+>## <span style="color:blue">R Markdown</span>
+
+Nos permite crear documentos a partir de R. Es una forma fácil de escribir y representar información para su análisis e interpretación. R Markdown es muy versátil y de mucha utilidad. Dependiendo las personas a las que vaya dirigido tu documento, puedes elegir si muestras el código o no. Normalmente si las personas no están familiarizadas con lenguajes de programación puede llegar a ser abrumador que el código este visible, por lo que R Markdown nos permite ocultarlo y mostrar solo la ejecución de este de una forma agradable y visualmente atractiva. 
+
+Existen diversos recursos donde podemos encontrar información de R Markdown uno de estos es [Pimp My RMD: A few tips for R Markdown](https://holtzy.github.io/Pimp-my-rmd/#custom_caption) 
+En esta pagina encontramos diversos consejos  para utilizar en nuestro documento desde el formato del texto hasta crear nuestro propio template. 
+
+Otra pagina bastante interesante y con consejos útiles es [Jozef R Markdown Tips](https://jozef.io/r909-rmarkdown-tips/) me gustaría enfocarme en el tema de pre visualización de forma Live, esta funcionalidad es de gran ayuda ya que que puedes ver los cambios en tus documentos de forma inmediata y determinar si necesita alguna modificación. Este tipo de visualización nos permite ser mas eficiente y ahorrar tiempo en el diseño de nuestros documentos.  
+
+```{r URL, echo=FALSE}
+theurl<- "https://www.worldometers.info/world-population/population-by-country/"
+file<-read_html(theurl)
+tables<-html_nodes(file, "table")
+table1 <- html_table(tables[1], fill = TRUE)
+data <- data.frame(table1)
+```
+
+```{r clasificacion continentes, echo=FALSE}
+colnames(data) <- c('id','country', 'population', 'yearly_change', 'net_change', 'density', 'land_area', 'migrants_net', 'fertility_rate', 'med_age', 'urban_pop', 'world_share')
+data$continent <- countrycode(sourcevar = data[,'country'], origin = 'country.name', destination = 'continent')
+```
+
+```{r fill na, echo=FALSE}
+data_na <- data[rowSums(is.na(data)) > 0,]
+#data$continent <- revalue(data$country, c("Eswatini"="Africa", "Micronesia"="Asia", "Channel Islands"="Europe"))
+#data <- data %>% mutate(continent = revalue(country, c("Eswatini"="Africa", "Micronesia"="Asia", "Channel Islands"="Europe")))
+data$continent <- recode(data$country, Eswatini="Africa", Micronesia="Asia", `Channel Islands`="Europe", .default = data$continent)
+```
+
+```{r lectura datos, echo=FALSE}
+data$country <- gsub("'", '', data$country)
+data <- transform(data, continent=as.factor(continent), fertility_rate=as.numeric(fertility_rate), med_age=as.numeric(med_age), country=as.factor(country))
+```
+
+>## <span style="color:blue">Fertilidad en la población mundial</span>
+
+A continuación, se puede observar un gráfico que nos muestre la relación entre edad mediana y el ratio de fertilidad para cada continente. Representaremos en el eje y la **edad mediana** y en el eje x el **ratio de fertilidad**. Además, para cada continente utilizaremos una gráfica diferente
+
+````{r grafico, echo=FALSE}
+graph <-  ggplot(data, aes(x = med_age, y = fertility_rate)) + 
+  geom_point(aes(group=country, color=continent)) +
+  facet_grid(~continent) +
+  geom_smooth(method = 'lm') +
+  theme_minimal() +
+  labs(x='Median Age', y='Fertility Rate', title='Distrubición por Continentes de la Reproducibilidad') +
+  theme(plot.title = element_text(hjust = 0.5))
+
+graph2 <- ggplotly(graph, tooltip = c('country'))
+
+graph2
+````
+
+>## <span style="color:blue">Países con mayor índice de fertilidad y su población total</span> 
+
+```{r tabla, echo=FALSE}
+tabla <- data %>% mutate(med_age = color_bar('lightgreen')(med_age)) %>% arrange(desc(fertility_rate)) %>% head(10) %>% kable(caption = 'Los 10 países con más fertilidad', escape=F) %>% kable_styling(bootstrap_options = c("striped", "hover"))
+
+tabla
+```
+
+>## <span style="color:blue">Conclusiones</span>
+
+De acuerdo al análisis realizado en este documento podemos observar que dentro del continente Africano se encuentra el Top 10 de países con más ratio de fertilidad.
+
+Podemos observar que el país **#1** con la mayor ratio de fertilidad es **Niger** con un total de población de 23. 310.715 
+
+En la primera columna se encuentra el numero de rank que ocupa cada país de acuerdo al Rank de países con mayor población. 
+
+En el análisis destaca Nigeria por ocupar el lugar **#7** de países con mayor población y el lugar **#8** de países con mayor ratio de fertilidad. Teniendo una mayor probabilidad de continuar ascendiendo en ambos temas.
+
+Entendemos que en el continente Africano se encuentran algunos de los países más pobres lo cual imposibilita la educación en temas de planeación familiar al igual que los recursos no son suficientes para brindar instrumentos y prevenir que el ratio de fertilidad aumente. 
+
+De igual forma podemos observar que la edad media de estos países es muy joven ya que este Top 10 se encuentra entre los 15 a 18 años de edad. 
+
+&nbsp;
+<hr />
+<p style="text-align: center;">Realizado por <a href="https://github.com/MiryamDov">Miryam Domínguez</a></p>
+<p style="text-align: center;"><span style="color: #808080;"><em>miryamdv024@gmail.com</em></span></p>
+
+<!-- Add icon library -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+<!-- Add font awesome icons -->
+<p style="text-align: center;">
+    <a href="https://www.linkedin.com/in/miryam-dominguez-vidales/" class="fa fa-linkedin"></a>
+    <a href="" class="https://github.com/MiryamDov"></a>
+</p>
+
+&nbsp;
